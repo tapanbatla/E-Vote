@@ -1,154 +1,159 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useSearchParams } from "next/navigation"
-import { useToast } from "@/components/ui/use-toast"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { Loader2, CheckCircle } from "lucide-react"
-import Link from "next/link"
-import { supabase } from "@/lib/supabase"
-import { OTPVerification } from "./otp-verification"
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, CheckCircle } from "lucide-react";
+import Link from "next/link";
+import { supabase } from "@/lib/supabase";
+import { OTPVerification } from "./otp-verification";
 
 export function CandidateStatus() {
-  const searchParams = useSearchParams()
-  const { toast } = useToast()
-  const [isLoading, setIsLoading] = useState(false)
-  const [isVerified, setIsVerified] = useState(false)
-  const [showOTPModal, setShowOTPModal] = useState(false)
-  const [candidateData, setCandidateData] = useState<any>(null)
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
+  const [showOTPModal, setShowOTPModal] = useState(false);
+  const [candidateData, setCandidateData] = useState<any>(null);
   const [searchData, setSearchData] = useState({
-    email: searchParams.get("email") || "",
-    candidateId: searchParams.get("id") || "",
-  })
-  const [error, setError] = useState<string | null>(null)
+    email: "",
+    candidateId: "",
+  });
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (searchParams.get("email") && searchParams.get("id")) {
-      handleSearch()
+    if (searchParams) {
+      const params = {
+        email: searchParams.get("email") || "",
+        candidateId: searchParams.get("id") || "",
+      };
+      setSearchData(params);
+      
+      if (params.email && params.candidateId) {
+        handleSearch(params);
+      }
     }
-  }, [])
+  }, [searchParams]);
 
-  const handleSearch = async () => {
-    if (!searchData.email || !searchData.candidateId) {
-      setError("Please enter both email and candidate ID")
-      return
+  const handleSearch = async (params?: { email: string; candidateId: string }) => {
+    const searchCriteria = params || searchData;
+    
+    if (!searchCriteria.email || !searchCriteria.candidateId) {
+      setError("Please enter both email and candidate ID");
+      return;
     }
 
-    setIsLoading(true)
-    setError(null)
+    setIsLoading(true);
+    setError(null);
 
     try {
       const { data, error } = await supabase
         .from("candidates")
         .select("*")
-        .eq("email", searchData.email)
-        .eq("candidate_id", searchData.candidateId)
-        .single()
+        .eq("email", searchCriteria.email)
+        .eq("candidate_id", searchCriteria.candidateId)
+        .single();
 
-      if (error) throw error
+      if (error) throw error;
 
       if (!data) {
-        throw new Error("No application found with the provided details")
+        throw new Error("No application found with the provided details");
       }
 
-      setCandidateData(data)
-      setIsVerified(data.email_verified)
+      setCandidateData(data);
+      setIsVerified(data.email_verified);
 
-      // If not verified and coming from application submission, show OTP modal
-      if (!data.email_verified && searchParams.get("email") && searchParams.get("id")) {
-        setShowOTPModal(true)
+      if (!data.email_verified && searchCriteria.email && searchCriteria.candidateId) {
+        setShowOTPModal(true);
       }
     } catch (err: any) {
-      console.error("Error searching for application:", err)
-      setError(err.message || "Failed to find application")
-      setCandidateData(null)
+      console.error("Error searching for application:", err);
+      setError(err.message || "Failed to find application");
+      setCandidateData(null);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const sendVerificationOTP = async () => {
     try {
-      // Send OTP
       const { error: otpError } = await supabase.auth.signInWithOtp({
         email: searchData.email,
-      })
+      });
 
-      if (otpError) throw otpError
+      if (otpError) throw otpError;
 
-      setShowOTPModal(true)
+      setShowOTPModal(true);
       toast({
         title: "Verification Code Sent",
         description: "Please check your email for the verification code",
-      })
+      });
     } catch (err: any) {
-      console.error("Error sending verification code:", err)
+      console.error("Error sending verification code:", err);
       toast({
         variant: "destructive",
         title: "Error",
         description: err.message || "Failed to send verification code",
-      })
+      });
     }
-  }
+  };
 
   const handleVerifyOTP = async (otp: string) => {
     try {
-      // Verify OTP
       const { error } = await supabase.auth.verifyOtp({
         email: searchData.email,
         token: otp,
         type: "email",
-      })
+      });
 
-      if (error) throw error
+      if (error) throw error;
 
-      // Update candidate as verified
       const { error: updateError } = await supabase
         .from("candidates")
         .update({ email_verified: true })
-        .eq("id", candidateData.id)
+        .eq("id", candidateData.id);
 
-      if (updateError) throw updateError
+      if (updateError) throw updateError;
 
-      setShowOTPModal(false)
-      setIsVerified(true)
+      setShowOTPModal(false);
+      setIsVerified(true);
 
-      // Refresh candidate data
-      const { data } = await supabase.from("candidates").select("*").eq("id", candidateData.id).single()
+      const { data } = await supabase.from("candidates").select("*").eq("id", candidateData.id).single();
 
       if (data) {
-        setCandidateData(data)
+        setCandidateData(data);
       }
 
       toast({
         title: "Email Verified",
         description: "Your email has been successfully verified",
-      })
+      });
     } catch (err: any) {
-      console.error("Error verifying OTP:", err)
+      console.error("Error verifying OTP:", err);
       toast({
         variant: "destructive",
         title: "Verification Failed",
         description: err.message || "Failed to verify code",
-      })
+      });
     }
-  }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "approved":
-        return "success"
+        return "success";
       case "rejected":
-        return "destructive"
+        return "destructive";
       default:
-        return "outline"
+        return "outline";
     }
-  }
+  };
 
   return (
     <Card className="max-w-2xl mx-auto">
@@ -184,7 +189,7 @@ export function CandidateStatus() {
                 placeholder="Enter your candidate ID"
               />
             </div>
-            <Button onClick={handleSearch} className="w-full" disabled={isLoading}>
+            <Button onClick={() => handleSearch()} className="w-full" disabled={isLoading}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -298,6 +303,5 @@ export function CandidateStatus() {
         />
       )}
     </Card>
-  )
+  );
 }
-
