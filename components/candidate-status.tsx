@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
@@ -293,6 +293,7 @@ export function CandidateStatus() {
           <Link href="/">Back to Home</Link>
         </Button>
       </CardFooter>
+
 
       {showOTPModal && (
         <OTPVerification
